@@ -1,0 +1,6 @@
+dash
+plotly
+pandas
+joblib
+numpy
+gunicorn
