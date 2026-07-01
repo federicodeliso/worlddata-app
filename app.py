@@ -5,263 +5,272 @@ import plotly.graph_objs as go
 from functools import lru_cache
 
 # =========================================================
-# 1. LOAD DATA ONCE
+# DATA
 # =========================================================
 datasets_dict = joblib.load("datasets.joblib")
 
-# Clean duplicate columns once
 for ds, df in datasets_dict.items():
     datasets_dict[ds] = df.loc[:, ~df.columns.duplicated()]
 
-# =========================================================
-# 2. DATASET TYPES
-# =========================================================
 dataset_types = {
     "Nominal": [ds for ds in datasets_dict if ("REAL" not in ds) and ("1990" not in ds) and ("2024" not in ds)],
     "Real 2024": [ds for ds in datasets_dict if "2024" in ds],
     "YoY % Change": list(datasets_dict.keys())
 }
 
-for key in dataset_types:
-    dataset_types[key].sort()
+for k in dataset_types:
+    dataset_types[k].sort()
 
-# =========================================================
-# 3. CACHE (IMPORTANT PERFORMANCE FIX)
-# =========================================================
 @lru_cache(maxsize=50)
 def get_dataset(ds_name):
     df = datasets_dict.get(ds_name)
     if df is None:
         return None
-
     df = df.copy()
-
-    if "Country Name" in df.columns:
-        return df
-
-    df = df.reset_index()
-    df.columns = ["Country Name"] + list(df.columns[1:])
+    if "Country Name" not in df.columns:
+        df = df.reset_index()
+        df.columns = ["Country Name"] + list(df.columns[1:])
     return df
 
 # =========================================================
-# 4. APP INIT
+# APP
 # =========================================================
-app = dash.Dash(__name__)
-app.title = "Stable Mobile Dashboard"
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
+server = app.server
 
 # =========================================================
-# 5. LAYOUT (MOBILE + FILTER TOGGLE)
+# HOME PAGE
 # =========================================================
-app.layout = html.Div([
+home_layout = html.Div([
+    html.H1("📊 Dashboard Home", style={"textAlign": "center"}),
 
-    html.H2("📊 Macro Dashboard", style={"textAlign": "center"}),
+    html.Br(),
 
-    html.Button(
-        "Filters ▼",
-        id="toggle-filters",
-        n_clicks=0,
-        style={
-            "width": "100%",
-            "padding": "12px",
-            "fontSize": "16px",
-            "marginBottom": "10px"
-        }
-    ),
-
-    html.Div(
-        id="filters-panel",
-        children=[
-
-            html.Div([
-                html.Label("Dataset Type"),
-                dcc.Dropdown(
-                    id="type-dropdown",
-                    options=[{"label": t, "value": t} for t in dataset_types.keys()],
-                    value="Nominal",
-                    clearable=False
-                ),
-            ], style={"padding": "8px"}),
-
-            html.Div([
-                html.Label("Datasets"),
-                dcc.Dropdown(
-                    id="dataset-dropdown",
-                    options=[],
-                    value=[],
-                    multi=True
-                ),
-            ], style={"padding": "8px"}),
-
-            html.Div([
-                html.Label("Countries"),
-                dcc.Dropdown(
-                    id="country-dropdown",
-                    options=[],
-                    value=[],
-                    multi=True
-                ),
-            ], style={"padding": "8px"}),
-
-        ],
-        style={"display": "block"}
-    ),
-
-    dcc.Graph(
-        id="line-chart",
-        style={"height": "65vh"}
-    )
+    dcc.Link("📈 Line Chart", href="/line"),
+    html.Br(),
+    dcc.Link("🔵 Scatter Comparison", href="/scatter"),
+    html.Br(),
+    dcc.Link("📊 Bar Ranking", href="/bar"),
 ])
 
 # =========================================================
-# 6. TOGGLE FILTERS
+# LINE PAGE (YOUR EXISTING ONE SIMPLIFIED HERE)
 # =========================================================
-@app.callback(
-    Output("filters-panel", "style"),
-    Output("toggle-filters", "children"),
-    Input("toggle-filters", "n_clicks"),
-    State("filters-panel", "style")
-)
-def toggle_filters(n, style):
-    if n % 2 == 1:
-        return {"display": "none"}, "Filters ▶"
-    return {"display": "block"}, "Filters ▼"
+line_layout = html.Div([
+
+    dcc.Link("⬅ Home", href="/"),
+    html.H2("Line Chart"),
+
+    dcc.Dropdown(
+        id="type-dropdown",
+        options=[{"label": t, "value": t} for t in dataset_types.keys()],
+        value="Nominal",
+        clearable=False
+    ),
+
+    dcc.Dropdown(id="dataset-dropdown", multi=True),
+    dcc.Dropdown(id="country-dropdown", multi=True),
+
+    dcc.Graph(id="line-chart")
+])
 
 # =========================================================
-# 7. DATASET DROPDOWN
+# SCATTER PAGE
+# =========================================================
+scatter_layout = html.Div([
+
+    dcc.Link("⬅ Home", href="/"),
+    html.H2("Scatter Comparison"),
+
+    dcc.Dropdown(
+        id="scatter-datasets",
+        options=[{"label": d, "value": d} for d in datasets_dict.keys()],
+        multi=True,
+        placeholder="Select 2 datasets"
+    ),
+
+    dcc.Dropdown(
+        id="scatter-countries",
+        options=[],
+        multi=True
+    ),
+
+    dcc.Slider(
+        id="scatter-year",
+        min=0,
+        max=10,
+        value=0,
+        step=1
+    ),
+
+    dcc.Graph(id="scatter-graph")
+])
+
+# =========================================================
+# BAR PAGE
+# =========================================================
+bar_layout = html.Div([
+
+    dcc.Link("⬅ Home", href="/"),
+    html.H2("Bar Ranking"),
+
+    dcc.Dropdown(
+        id="bar-dataset",
+        options=[{"label": d, "value": d} for d in datasets_dict.keys()]
+    ),
+
+    dcc.Slider(
+        id="bar-year",
+        min=0,
+        max=10,
+        value=0,
+        step=1
+    ),
+
+    dcc.Graph(id="bar-graph")
+])
+
+# =========================================================
+# ROUTING
+# =========================================================
+app.layout = html.Div([
+    dcc.Location(id="url"),
+    html.Div(id="page-content")
+])
+
+@app.callback(Output("page-content", "children"),
+              Input("url", "pathname"))
+def display_page(path):
+    if path == "/line":
+        return line_layout
+    elif path == "/scatter":
+        return scatter_layout
+    elif path == "/bar":
+        return bar_layout
+    return home_layout
+
+# =========================================================
+# LINE CHART CALLBACK (simplified version)
 # =========================================================
 @app.callback(
     Output("dataset-dropdown", "options"),
     Output("dataset-dropdown", "value"),
     Input("type-dropdown", "value")
 )
-def update_dataset_options(selected_type):
+def update_ds(t):
+    ds = dataset_types[t]
+    return [{"label": x, "value": x} for x in ds], ds[:1]
 
-    datasets = dataset_types.get(selected_type, [])
-    options = [{"label": ds, "value": ds} for ds in datasets]
-
-    default_map = {
-        "Nominal": datasets[0] if datasets else None,
-        "Real 2024": datasets[0] if datasets else None,
-        "YoY % Change": datasets[0] if datasets else None
-    }
-
-    default_value = default_map.get(selected_type)
-
-    value = [default_value] if default_value else []
-
-    return options, value
-
-# =========================================================
-# 8. COUNTRY DROPDOWN (FAST + SAFE)
-# =========================================================
 @app.callback(
     Output("country-dropdown", "options"),
     Output("country-dropdown", "value"),
-    Input("dataset-dropdown", "value"),
-    State("country-dropdown", "value")
+    Input("dataset-dropdown", "value")
 )
-def update_country_options(selected_datasets, selected_countries):
-
-    if not selected_datasets:
+def update_country(ds):
+    if not ds:
         return [], ["Italy"]
 
     countries = set()
-
-    for ds in selected_datasets:
-        df = get_dataset(ds)
-        if df is None:
-            continue
-
-        col = "Country Name"
-
-        for c in df[col].dropna().astype(str).unique():
-            countries.add(c.strip())
+    for d in ds:
+        df = get_dataset(d)
+        countries.update(df["Country Name"].astype(str).unique())
 
     countries = sorted(list(countries))
+    return [{"label": c, "value": c} for c in countries], countries[:1]
 
-    options = [{"label": c, "value": c} for c in countries]
-
-    if not countries:
-        return [], ["Italy"]
-
-    value = selected_countries or (["Italy"] if "Italy" in countries else [countries[0]])
-
-    return options, value
-
-# =========================================================
-# 9. CHART (OPTIMIZED - NO HEAVY REBUILDING)
-# =========================================================
 @app.callback(
     Output("line-chart", "figure"),
     Input("dataset-dropdown", "value"),
-    Input("country-dropdown", "value"),
-    Input("type-dropdown", "value")
+    Input("country-dropdown", "value")
 )
-def update_line_chart(selected_datasets, selected_countries, selected_type):
+def line(ds_list, countries):
 
     fig = go.Figure()
-
-    if not selected_datasets or not selected_countries:
-        fig.update_layout(title="Select dataset and country")
+    if not ds_list or not countries:
         return fig
 
-    yaxis_title = "Value"
-
-    for ds in selected_datasets:
-
+    for ds in ds_list:
         df = get_dataset(ds)
-        if df is None:
-            continue
+        years = df.columns[1:]
 
-        country_col = "Country Name"
-        year_cols = df.columns[1:]
-
-        for country in selected_countries:
-
-            row = df[df[country_col] == country]
+        for c in countries:
+            row = df[df["Country Name"] == c]
             if row.empty:
                 continue
 
-            values = row.iloc[0, 1:]
-
-            # safe numeric conversion
-            values = values.apply(
-                lambda x: float(x)
-                if str(x).replace('.', '', 1).replace('-', '', 1).isdigit()
-                else None
-            )
-
-            if selected_type == "YoY % Change":
-                values = values.pct_change() * 100
-                yaxis_title = "YoY % Change (%)"
-
             fig.add_trace(go.Scatter(
-                x=year_cols,
-                y=values,
-                mode="lines+markers",
-                name=f"{country} - {ds}"
+                x=years,
+                y=row.iloc[0, 1:],
+                name=f"{c}-{ds}"
             ))
-
-    fig.update_layout(
-        title="Macro Time Series",
-        xaxis_title="Year",
-        yaxis_title=yaxis_title,
-        template="plotly_white",
-        hovermode="x unified",
-
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5
-        )
-    )
 
     return fig
 
 # =========================================================
-# 10. RUN APP
+# SCATTER (basic structure)
 # =========================================================
+@app.callback(
+    Output("scatter-graph", "figure"),
+    Input("scatter-datasets", "value"),
+    Input("scatter-countries", "value"),
+    Input("scatter-year", "value")
+)
+def scatter(ds, countries, year_idx):
 
-server = app.server
+    fig = go.Figure()
+    if not ds or len(ds) < 2 or not countries:
+        return fig
+
+    d1 = get_dataset(ds[0])
+    d2 = get_dataset(ds[1])
+    years = d1.columns[1:]
+
+    year = years[year_idx]
+
+    for c in countries:
+        v1 = d1[d1["Country Name"] == c][year].values
+        v2 = d2[d2["Country Name"] == c][year].values
+
+        if len(v1) and len(v2):
+            fig.add_trace(go.Scatter(
+                x=[v1[0]],
+                y=[v2[0]],
+                mode="markers+text",
+                text=[c],
+                name=c
+            ))
+
+    return fig
+
+# =========================================================
+# BAR CHART
+# =========================================================
+@app.callback(
+    Output("bar-graph", "figure"),
+    Input("bar-dataset", "value"),
+    Input("bar-year", "value")
+)
+def bar(ds, year_idx):
+
+    fig = go.Figure()
+    if not ds:
+        return fig
+
+    df = get_dataset(ds)
+    year = df.columns[1:][year_idx]
+
+    values = df[["Country Name", year]].dropna()
+    values = values.sort_values(year, ascending=False)
+
+    fig.add_trace(go.Bar(
+        x=values["Country Name"],
+        y=values[year]
+    ))
+
+    return fig
+
+# =========================================================
+# RUN
+# =========================================================
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8050, debug=False)
