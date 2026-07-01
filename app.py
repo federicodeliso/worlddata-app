@@ -1,6 +1,6 @@
 import joblib
 import dash
-from dash import dcc, html, Input, Output, State
+from dash import dcc, html, Input, Output
 import plotly.graph_objs as go
 from functools import lru_cache
 
@@ -39,33 +39,76 @@ app = dash.Dash(__name__, suppress_callback_exceptions=True)
 server = app.server
 
 # =========================================================
-# HOME PAGE
+# HOME (NEW PRETTY UI)
 # =========================================================
 home_layout = html.Div([
-    html.H1("📊 Dashboard Home", style={"textAlign": "center"}),
 
-    html.Br(),
+    html.Div([
+        html.H1("📊 Macro Analytics Dashboard",
+                style={"textAlign": "center", "color": "#2c3e50"}),
 
-    dcc.Link("📈 Line Chart", href="/line"),
-    html.Br(),
-    dcc.Link("🔵 Scatter Comparison", href="/scatter"),
-    html.Br(),
-    dcc.Link("📊 Bar Ranking", href="/bar"),
+        html.P("Select a module below",
+               style={"textAlign": "center", "color": "#7f8c8d"})
+    ]),
+
+    html.Div([
+
+        dcc.Link(
+            html.Div([
+                html.H3("📈 Line Chart"),
+                html.P("Trends over time by country & dataset")
+            ], style={
+                "padding": "20px",
+                "margin": "10px",
+                "borderRadius": "12px",
+                "backgroundColor": "#ecf0f1",
+                "textAlign": "center"
+            }),
+            href="/line"
+        ),
+
+        dcc.Link(
+            html.Div([
+                html.H3("🔵 Scatter Analysis"),
+                html.P("Compare datasets across countries & time")
+            ], style={
+                "padding": "20px",
+                "margin": "10px",
+                "borderRadius": "12px",
+                "backgroundColor": "#ecf0f1",
+                "textAlign": "center"
+            }),
+            href="/scatter"
+        ),
+
+        dcc.Link(
+            html.Div([
+                html.H3("📊 Ranking Bar Chart"),
+                html.P("Top / bottom countries comparison")
+            ], style={
+                "padding": "20px",
+                "margin": "10px",
+                "borderRadius": "12px",
+                "backgroundColor": "#ecf0f1",
+                "textAlign": "center"
+            }),
+            href="/bar"
+        ),
+
+    ], style={"maxWidth": "600px", "margin": "auto"})
 ])
 
 # =========================================================
-# LINE PAGE (YOUR EXISTING ONE SIMPLIFIED HERE)
+# LINE (YOUR LOGIC KEPT)
 # =========================================================
 line_layout = html.Div([
-
     dcc.Link("⬅ Home", href="/"),
     html.H2("Line Chart"),
 
     dcc.Dropdown(
         id="type-dropdown",
         options=[{"label": t, "value": t} for t in dataset_types.keys()],
-        value="Nominal",
-        clearable=False
+        value="Nominal"
     ),
 
     dcc.Dropdown(id="dataset-dropdown", multi=True),
@@ -75,57 +118,43 @@ line_layout = html.Div([
 ])
 
 # =========================================================
-# SCATTER PAGE
+# SCATTER (FIXED SIMPLE)
 # =========================================================
 scatter_layout = html.Div([
-
     dcc.Link("⬅ Home", href="/"),
-    html.H2("Scatter Comparison"),
+    html.H2("Scatter Analysis"),
 
     dcc.Dropdown(
-        id="scatter-datasets",
+        id="scatter-ds",
         options=[{"label": d, "value": d} for d in datasets_dict.keys()],
         multi=True,
         placeholder="Select 2 datasets"
     ),
 
     dcc.Dropdown(
-        id="scatter-countries",
+        id="scatter-country",
         options=[],
         multi=True
     ),
 
-    dcc.Slider(
-        id="scatter-year",
-        min=0,
-        max=10,
-        value=0,
-        step=1
-    ),
+    dcc.Slider(id="scatter-year", min=0, max=10, step=1, value=0),
 
     dcc.Graph(id="scatter-graph")
 ])
 
 # =========================================================
-# BAR PAGE
+# BAR (FIXED CLEAN)
 # =========================================================
 bar_layout = html.Div([
-
     dcc.Link("⬅ Home", href="/"),
-    html.H2("Bar Ranking"),
+    html.H2("Ranking Chart"),
 
     dcc.Dropdown(
-        id="bar-dataset",
+        id="bar-ds",
         options=[{"label": d, "value": d} for d in datasets_dict.keys()]
     ),
 
-    dcc.Slider(
-        id="bar-year",
-        min=0,
-        max=10,
-        value=0,
-        step=1
-    ),
+    dcc.Slider(id="bar-year", min=0, max=10, step=1, value=0),
 
     dcc.Graph(id="bar-graph")
 ])
@@ -135,22 +164,22 @@ bar_layout = html.Div([
 # =========================================================
 app.layout = html.Div([
     dcc.Location(id="url"),
-    html.Div(id="page-content")
+    html.Div(id="page")
 ])
 
-@app.callback(Output("page-content", "children"),
+@app.callback(Output("page", "children"),
               Input("url", "pathname"))
-def display_page(path):
+def router(path):
     if path == "/line":
         return line_layout
-    elif path == "/scatter":
+    if path == "/scatter":
         return scatter_layout
-    elif path == "/bar":
+    if path == "/bar":
         return bar_layout
     return home_layout
 
 # =========================================================
-# LINE CHART CALLBACK (simplified version)
+# LINE (UNCHANGED CORE LOGIC)
 # =========================================================
 @app.callback(
     Output("dataset-dropdown", "options"),
@@ -204,15 +233,21 @@ def line(ds_list, countries):
                 name=f"{c}-{ds}"
             ))
 
+    fig.update_layout(
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(orientation="h", y=1.1)
+    )
+
     return fig
 
 # =========================================================
-# SCATTER (basic structure)
+# SCATTER FIXED
 # =========================================================
 @app.callback(
     Output("scatter-graph", "figure"),
-    Input("scatter-datasets", "value"),
-    Input("scatter-countries", "value"),
+    Input("scatter-ds", "value"),
+    Input("scatter-country", "value"),
     Input("scatter-year", "value")
 )
 def scatter(ds, countries, year_idx):
@@ -223,9 +258,9 @@ def scatter(ds, countries, year_idx):
 
     d1 = get_dataset(ds[0])
     d2 = get_dataset(ds[1])
-    years = d1.columns[1:]
 
-    year = years[year_idx]
+    years = d1.columns[1:]
+    year = years[min(year_idx, len(years)-1)]
 
     for c in countries:
         v1 = d1[d1["Country Name"] == c][year].values
@@ -236,18 +271,17 @@ def scatter(ds, countries, year_idx):
                 x=[v1[0]],
                 y=[v2[0]],
                 mode="markers+text",
-                text=[c],
-                name=c
+                text=[c]
             ))
 
     return fig
 
 # =========================================================
-# BAR CHART
+# BAR FIXED
 # =========================================================
 @app.callback(
     Output("bar-graph", "figure"),
-    Input("bar-dataset", "value"),
+    Input("bar-ds", "value"),
     Input("bar-year", "value")
 )
 def bar(ds, year_idx):
@@ -257,14 +291,15 @@ def bar(ds, year_idx):
         return fig
 
     df = get_dataset(ds)
-    year = df.columns[1:][year_idx]
+    years = df.columns[1:]
+    year = years[min(year_idx, len(years)-1)]
 
-    values = df[["Country Name", year]].dropna()
-    values = values.sort_values(year, ascending=False)
+    data = df[["Country Name", year]].dropna()
+    data = data.sort_values(year, ascending=False).head(15)
 
     fig.add_trace(go.Bar(
-        x=values["Country Name"],
-        y=values[year]
+        x=data["Country Name"],
+        y=data[year]
     ))
 
     return fig
