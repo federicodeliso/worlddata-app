@@ -2,27 +2,25 @@ import joblib
 import dash
 from dash import dcc, html, Input, Output
 import plotly.graph_objs as go
+import numpy as np
 from functools import lru_cache
 
 # =========================================================
-# LOAD DATA
+# DATA
 # =========================================================
 datasets_dict = joblib.load("datasets.joblib")
 
 for ds, df in datasets_dict.items():
     datasets_dict[ds] = df.loc[:, ~df.columns.duplicated()]
 
-# =========================================================
-# YEAR RANGE (REAL FIX)
-# =========================================================
 YEARS = [str(y) for y in range(1960, 2025)]
 
 # =========================================================
 # CACHE
 # =========================================================
 @lru_cache(maxsize=50)
-def get_dataset(ds_name):
-    df = datasets_dict.get(ds_name)
+def get_dataset(ds):
+    df = datasets_dict.get(ds)
     if df is None:
         return None
 
@@ -41,52 +39,47 @@ app = dash.Dash(__name__, suppress_callback_exceptions=True)
 server = app.server
 
 # =========================================================
-# HOME (CLEAN)
+# HOME
 # =========================================================
 home = html.Div([
-    html.H1("📊 Macro Dashboard",
-            style={"textAlign": "center", "marginTop": "20px"}),
+    html.H1("📊 Macro Dashboard", style={"textAlign": "center"}),
 
     html.Div([
-        dcc.Link("📈 Line Chart", href="/line"),
-        html.Br(),
-        dcc.Link("🔵 Scatter", href="/scatter"),
-        html.Br(),
-        dcc.Link("📊 Bar Ranking", href="/bar"),
+        dcc.Link("📈 Line Chart", href="/line"), html.Br(),
+        dcc.Link("🔵 Scatter + Regression", href="/scatter"), html.Br(),
+        dcc.Link("📊 Bar Ranking", href="/bar")
     ], style={"textAlign": "center", "fontSize": "20px"})
 ])
 
 # =========================================================
-# LINE PAGE (IMPROVED LOOK)
+# LINE PAGE (RESTORED BEAUTIFUL STYLE)
 # =========================================================
-line_page = html.Div([
+line = html.Div([
 
     dcc.Link("⬅ Home", href="/"),
 
     html.H2("Line Chart", style={"textAlign": "center"}),
 
     dcc.Dropdown(
-        id="ds-type",
+        id="line-ds",
         options=[{"label": k, "value": k} for k in datasets_dict.keys()],
         value=list(datasets_dict.keys())[0],
         clearable=False
     ),
 
-    dcc.Dropdown(id="country", multi=True),
+    dcc.Dropdown(id="line-country", multi=True),
 
-    dcc.Graph(
-        id="line",
-        style={"height": "75vh"}
-    )
+    dcc.Graph(id="line-chart", style={"height": "75vh"})
 ])
 
 # =========================================================
 # SCATTER PAGE
 # =========================================================
-scatter_page = html.Div([
+scatter = html.Div([
 
     dcc.Link("⬅ Home", href="/"),
-    html.H2("Scatter Comparison"),
+
+    html.H2("Scatter + Regression"),
 
     dcc.Dropdown(
         id="scatter-ds",
@@ -97,20 +90,20 @@ scatter_page = html.Div([
     dcc.Dropdown(id="scatter-country", multi=True),
 
     dcc.Slider(
-        id="year-slider",
+        id="scatter-year",
         min=1960,
         max=2024,
         value=2000,
-        marks={y: str(y) for y in range(1960, 2025, 10)}
+        marks={1960:"1960", 1980:"1980", 2000:"2000", 2024:"2024"}
     ),
 
-    dcc.Graph(id="scatter", style={"height": "70vh"})
+    dcc.Graph(id="scatter-graph", style={"height": "70vh"})
 ])
 
 # =========================================================
-# BAR PAGE
+# BAR PAGE (TOP/BOTTOM + COUNT)
 # =========================================================
-bar_page = html.Div([
+bar = html.Div([
 
     dcc.Link("⬅ Home", href="/"),
 
@@ -122,15 +115,38 @@ bar_page = html.Div([
         value=list(datasets_dict.keys())[0]
     ),
 
-    dcc.Slider(
-        id="bar-year",
-        min=1960,
-        max=2024,
-        value=2000,
-        marks={y: str(y) for y in range(1960, 2025, 10)}
-    ),
+    html.Div([
+        dcc.Slider(
+            id="bar-year",
+            min=1960,
+            max=2024,
+            value=2000,
+            marks={1960:"1960", 1980:"1980", 2000:"2000", 2024:"2024"}
+        )
+    ]),
 
-    dcc.Graph(id="bar", style={"height": "70vh"})
+    html.Div([
+        dcc.RadioItems(
+            id="bar-mode",
+            options=[
+                {"label": "Top", "value": "top"},
+                {"label": "Bottom", "value": "bottom"}
+            ],
+            value="top",
+            inline=True
+        ),
+
+        dcc.Slider(
+            id="bar-count",
+            min=5,
+            max=30,
+            step=5,
+            value=10,
+            marks={5:"5", 10:"10", 20:"20", 30:"30"}
+        )
+    ]),
+
+    dcc.Graph(id="bar-graph", style={"height": "70vh"})
 ])
 
 # =========================================================
@@ -143,32 +159,32 @@ app.layout = html.Div([
 
 @app.callback(Output("page", "children"),
               Input("url", "pathname"))
-def router(path):
-    if path == "/line":
-        return line_page
-    if path == "/scatter":
-        return scatter_page
-    if path == "/bar":
-        return bar_page
+def router(p):
+    if p == "/line":
+        return line
+    if p == "/scatter":
+        return scatter
+    if p == "/bar":
+        return bar
     return home
 
 # =========================================================
-# LINE (FIXED COUNTRY LINK)
+# LINE (RESTORED BEAUTY)
 # =========================================================
 @app.callback(
-    Output("country", "options"),
-    Output("country", "value"),
-    Input("ds-type", "value")
+    Output("line-country", "options"),
+    Output("line-country", "value"),
+    Input("line-ds", "value")
 )
-def load_countries(ds):
+def line_countries(ds):
     df = get_dataset(ds)
-    countries = df["Country Name"].dropna().astype(str).unique()
-    return [{"label": c, "value": c} for c in countries], [countries[0]] if len(countries) else []
+    c = df["Country Name"].astype(str).unique()
+    return [{"label":x,"value":x} for x in c], list(c[:1])
 
 @app.callback(
-    Output("line", "figure"),
-    Input("ds-type", "value"),
-    Input("country", "value")
+    Output("line-chart", "figure"),
+    Input("line-ds", "value"),
+    Input("line-country", "value")
 )
 def line_chart(ds, countries):
 
@@ -177,7 +193,6 @@ def line_chart(ds, countries):
 
     for c in countries or []:
         row = df[df["Country Name"] == c]
-
         if row.empty:
             continue
 
@@ -190,85 +205,110 @@ def line_chart(ds, countries):
 
     fig.update_layout(
         template="plotly_white",
-        height=700,
-        margin=dict(l=20, r=20, t=40, b=20),
-        legend=dict(orientation="h", y=1.1)
+        height=750,
+        margin=dict(l=20,r=20,t=40,b=20),
+        legend=dict(orientation="h", y=1.05)
     )
 
     return fig
 
 # =========================================================
-# SCATTER (REAL DATA LINK)
+# SCATTER + REGRESSION LINE
 # =========================================================
 @app.callback(
     Output("scatter-country", "options"),
     Output("scatter-country", "value"),
     Input("scatter-ds", "value")
 )
-def scatter_countries(ds_list):
-
-    if not ds_list:
+def sc_countries(ds):
+    if not ds:
         return [], []
-
-    df = get_dataset(ds_list[0])
-    countries = df["Country Name"].dropna().unique()
-
-    return [{"label": c, "value": c} for c in countries], list(countries[:3])
+    df = get_dataset(ds[0])
+    c = df["Country Name"].unique()
+    return [{"label":x,"value":x} for x in c], list(c[:3])
 
 @app.callback(
-    Output("scatter", "figure"),
+    Output("scatter-graph", "figure"),
     Input("scatter-ds", "value"),
     Input("scatter-country", "value"),
-    Input("year-slider", "value")
+    Input("scatter-year", "value")
 )
-def scatter(ds_list, countries, year):
+def scatter_fn(ds, countries, year):
 
     fig = go.Figure()
 
-    if not ds_list or len(ds_list) < 2:
+    if not ds or len(ds) < 2:
         return fig
+
+    d1 = get_dataset(ds[0])
+    d2 = get_dataset(ds[1])
 
     y = str(year)
 
-    d1 = get_dataset(ds_list[0])
-    d2 = get_dataset(ds_list[1])
+    xs = []
+    ys = []
 
     for c in countries or []:
         v1 = d1[d1["Country Name"] == c][y].values
         v2 = d2[d2["Country Name"] == c][y].values
 
         if len(v1) and len(v2):
+            x = float(v1[0])
+            yv = float(v2[0])
+
+            xs.append(x)
+            ys.append(yv)
+
             fig.add_trace(go.Scatter(
-                x=[v1[0]],
-                y=[v2[0]],
-                mode="markers+text",
-                text=[c]
+                x=[x],
+                y=[yv],
+                mode="markers",
+                text=[c],
+                hovertemplate=c
             ))
 
-    fig.update_layout(template="plotly_white")
+    # regression line
+    if len(xs) > 2:
+        m, b = np.polyfit(xs, ys, 1)
+        x_line = np.linspace(min(xs), max(xs), 50)
+        y_line = m * x_line + b
+
+        fig.add_trace(go.Scatter(
+            x=x_line,
+            y=y_line,
+            mode="lines",
+            name="Trend",
+            line=dict(dash="dash")
+        ))
+
+    fig.update_layout(
+        template="plotly_white",
+        hovermode="closest"
+    )
 
     return fig
 
 # =========================================================
-# BAR (REAL CONNECTION)
+# BAR (TOP/BOTTOM + COUNT)
 # =========================================================
 @app.callback(
-    Output("bar", "figure"),
+    Output("bar-graph", "figure"),
     Input("bar-ds", "value"),
-    Input("bar-year", "value")
+    Input("bar-year", "value"),
+    Input("bar-mode", "value"),
+    Input("bar-count", "value")
 )
-def bar(ds, year):
+def bar_fn(ds, year, mode, count):
 
     fig = go.Figure()
-
     df = get_dataset(ds)
     y = str(year)
 
-    if y not in df.columns:
-        return fig
-
     data = df[["Country Name", y]].dropna()
-    data = data.sort_values(y, ascending=False).head(15)
+
+    data = data.sort_values(y, ascending=(mode == "bottom"))
+
+    data = data.head(count)
 
     fig.add_trace(go.Bar(
         x=data["Country Name"],
