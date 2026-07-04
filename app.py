@@ -62,8 +62,9 @@ line = html.Div([
 
     dcc.Dropdown(
         id="line-ds",
-        options=[{"label": k, "value": k} for k in datasets_dict.keys()],
-        value=list(datasets_dict.keys())[0],
+        options=dataset_options,
+        value=[dataset_options[0]["value"]],
+        multi=True,
         clearable=False
     ),
 
@@ -167,47 +168,103 @@ def router(p):
     if p == "/bar":
         return bar
     return home
-
 # =========================================================
-# LINE (RESTORED BEAUTY)
+# LINE GRAPH (MULTIPLE DATASETS)
 # =========================================================
 @app.callback(
-    Output("line-country", "options"),
-    Output("line-country", "value"),
-    Input("line-ds", "value")
-)
-def line_countries(ds):
-    df = get_dataset(ds)
-    c = df["Country Name"].astype(str).unique()
-    return [{"label":x,"value":x} for x in c], list(c[:1])
-
-@app.callback(
-    Output("line-chart", "figure"),
+    Output("line-graph", "figure"),
     Input("line-ds", "value"),
     Input("line-country", "value")
 )
-def line_chart(ds, countries):
+def line_fn(datasets, country):
 
     fig = go.Figure()
-    df = get_dataset(ds)
 
-    for c in countries or []:
-        row = df[df["Country Name"] == c]
+    if not datasets or not country:
+        fig.update_layout(template="plotly_white")
+        return fig
+
+    colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf"
+    ]
+
+    for i, ds in enumerate(datasets):
+
+        df = get_dataset(ds)
+
+        row = df[df["Country Name"] == country]
+
         if row.empty:
             continue
 
-        fig.add_trace(go.Scatter(
-            x=YEARS,
-            y=row.iloc[0][YEARS],
-            mode="lines",
-            name=c
-        ))
+        years = []
+        values = []
+
+        for col in df.columns:
+
+            if col.isdigit():
+
+                value = row.iloc[0][col]
+
+                if value is not None and str(value) != "nan":
+                    years.append(int(col))
+                    values.append(float(value))
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=values,
+                mode="lines+markers",
+                name=ds,
+                line=dict(
+                    color=colors[i % len(colors)],
+                    width=3,
+                    shape="spline",
+                    smoothing=0.4
+                ),
+                marker=dict(
+                    size=6
+                ),
+                hovertemplate=(
+                    "<b>%{fullData.name}</b><br>"
+                    "Year: %{x}<br>"
+                    "Value: %{y:,.2f}"
+                    "<extra></extra>"
+                )
+            )
+        )
 
     fig.update_layout(
+        title=f"{country}",
         template="plotly_white",
-        height=750,
-        margin=dict(l=20,r=20,t=40,b=20),
-        legend=dict(orientation="h", y=1.05)
+        height=600,
+        hovermode="x unified",
+        xaxis=dict(
+            title="Year",
+            rangeslider=dict(visible=True),
+            showgrid=True
+        ),
+        yaxis=dict(
+            title="Value",
+            showgrid=True,
+            zeroline=False
+        ),
+        legend=dict(
+            orientation="h",
+            y=1.12,
+            x=0.5,
+            xanchor="center"
+        ),
+        margin=dict(l=50, r=30, t=80, b=50)
     )
 
     return fig
