@@ -1,14 +1,16 @@
 import joblib
 import dash
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output, State
 import plotly.graph_objs as go
 import plotly.express as px
 import numpy as np
 from functools import lru_cache
 
+
 # =========================================================
 # DATA
 # =========================================================
+
 datasets_dict = joblib.load("datasets.joblib")
 
 for ds, df in datasets_dict.items():
@@ -225,20 +227,35 @@ def router(p):
 @app.callback(
     Output("line-country", "options"),
     Output("line-country", "value"),
-    Input("line-ds", "value")
+    Input("line-ds", "value"),
+    State("line-country", "value")
 )
-def update_countries(datasets):
+def update_countries(datasets, selected):
 
     if not datasets:
         return [], []
 
     df = get_dataset(datasets[0])
+
     countries = sorted(df["Country Name"].dropna().unique())
 
-    return (
-        [{"label": c, "value": c} for c in countries],
-        countries[:3]
-    )
+    options = [{"label": c, "value": c} for c in countries]
+
+    # Keep previously selected countries if they still exist
+    if selected:
+        keep = [c for c in selected if c in countries]
+        if keep:
+            return options, keep
+
+    # Default selection: Italy
+    if "Italy" in countries:
+        return options, ["Italy"]
+
+    # Fallback
+    if countries:
+        return options, [countries[0]]
+
+    return options, []
 
 
 # =========================================================
