@@ -191,9 +191,16 @@ bar = html.Div([
     dcc.Slider(
         id="bar-count",
         min=5,
-        max=30,
+        max=100,
         step=5,
-        value=10
+        value=10,
+        marks={
+            5: "5",
+            25: "25",
+            50: "50",
+            75: "75",
+            100: "100"
+        }
     ),
 
     dcc.Graph(id="bar-graph", style={"height": "70vh"})
