@@ -23,6 +23,144 @@ dataset_options = [
     for k in sorted(datasets_dict.keys())
 ]
 
+MASKS = ["Grouped", "Standard", "Detailed"]
+
+dataset_types = {
+    "Nominal": [
+        ds for ds in datasets_dict
+        if ("REAL" not in ds)
+        and ("1990" not in ds)
+        and ("2024" not in ds)
+    ],
+
+    "Real 2024": [
+        ds for ds in datasets_dict
+        if "2024" in ds
+    ],
+
+    "YoY % Change": sorted(datasets_dict.keys())
+}
+
+for k in dataset_types:
+    dataset_types[k] = sorted(dataset_types[k])
+
+eu28 = [
+    "Austria","Belgium","Bulgaria","Cyprus","Czechia","Germany","Denmark",
+    "Spain","Estonia","Finland","France","Greece","Croatia","Hungary",
+    "Ireland","Italy","Lithuania","Luxembourg","Latvia","Malta",
+    "Netherlands","Poland","Portugal","Romania","Slovakia",
+    "Slovenia","Sweden","United Kingdom"
+]
+
+eu27 = eu28[:-1]
+
+subnational_names = [
+    # India
+    "Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar",
+    "Chandigarh","Chhattisgarh","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh",
+    "Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra",
+    "Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan",
+    "Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+
+    # China
+    "Anhui","Beijing","Chongqing","Fujian","Gansu","Guangdong","Guangxi","Guizhou",
+    "Hainan","Hebei","Heilongjiang","Henan","Hubei","Hunan","Inner Mongolia",
+    "Jiangsu","Jiangxi","Jilin","Liaoning","Ningxia","Qinghai","Shaanxi",
+    "Shandong","Shanghai","Shanxi","Sichuan","Tianjin","Tibet","Xinjiang",
+    "Yunnan","Zhejiang",
+
+    # Canada
+    "Alberta","British Columbia","Manitoba","New Brunswick",
+    "Newfoundland and Labrador","Northwest Territories","Nova Scotia",
+    "Nunavut","Ontario","Prince Edward Island","Quebec",
+    "Saskatchewan","Yukon",
+
+    # USA
+    "Alabama","Alaska","Arizona","Arkansas","California","Colorado",
+    "Connecticut","Delaware","District of Columbia","Florida","Georgia",
+    "Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+    "Louisiana","Maine","Maryland","Massachusetts","Michigan",
+    "Minnesota","Mississippi","Missouri","Montana","Nebraska",
+    "Nevada","New Hampshire","New Jersey","New Mexico","New York",
+    "North Carolina","North Dakota","Ohio","Oklahoma","Oregon",
+    "Pennsylvania","Rhode Island","South Carolina","South Dakota",
+    "Tennessee","Texas","Utah","Vermont","Virginia","Washington",
+    "West Virginia","Wisconsin","Wyoming"
+]
+
+US_STATES = set(subnational_names[-50:])
+CANADA_PROVINCES = set(subnational_names[-63:-50])
+CHINA_PROVINCES = set(subnational_names[33:64])
+INDIA_STATES = set(subnational_names[:33])
+
+
+def mask_grouped(df, year):
+
+    df = df.copy()
+
+    cols = df.columns.drop("Country Name")
+
+    df.loc[df["Country Name"].isin(subnational_names), cols] = np.nan
+    df.loc[df["Country Name"].isin(eu27), cols] = np.nan
+
+    if int(year) <= 2018:
+
+        df.loc[df["Country Name"] == "United Kingdom", cols] = np.nan
+        df.loc[df["Country Name"] == "EU27", cols] = np.nan
+
+    else:
+
+        df.loc[df["Country Name"] == "EU28", cols] = np.nan
+
+    return df
+
+
+def mask_standard(df, year):
+
+    df = df.copy()
+
+    cols = df.columns.drop("Country Name")
+
+    df.loc[df["Country Name"].isin(["EU27","EU28"]), cols] = np.nan
+
+    df.loc[df["Country Name"].isin(subnational_names), cols] = np.nan
+
+    return df
+
+
+def mask_detailed(df, year):
+
+    df = df.copy()
+
+    cols = df.columns.drop("Country Name")
+
+    df.loc[df["Country Name"].isin(["EU27","EU28"]), cols] = np.nan
+
+    for country in [
+        "United States",
+        "China",
+        "Canada",
+        "India"
+    ]:
+
+        df.loc[df["Country Name"] == country, cols] = np.nan
+
+    return df
+
+
+def apply_mask(df, mask_name, year):
+
+    if mask_name == "Grouped":
+        return mask_grouped(df, year)
+
+    if mask_name == "Standard":
+        return mask_standard(df, year)
+
+    if mask_name == "Detailed":
+        return mask_detailed(df, year)
+
+    return df
+
 # =========================================================
 # CACHE
 # =========================================================
@@ -154,58 +292,133 @@ scatter = html.Div([
     dcc.Graph(id="scatter-graph", style={"height": "70vh"})
 ])
 
-
 # =========================================================
 # BAR PAGE
 # =========================================================
-bar = html.Div([
 
-    html.Div([dcc.Link("← Back to Home", href="/")], style={"padding": "10px"}),
+bar = html.Div(
 
-    html.H2("Country Rankings"),
+    style={
+        "backgroundColor": "#f4f6f9",
+        "padding": "20px",
+        "fontFamily": "Arial"
+    },
 
-    dcc.Dropdown(
-        id="bar-ds",
-        options=dataset_options,
-        value=dataset_options[0]["value"]
-    ),
+    children=[
 
-    dcc.Slider(
-        id="bar-year",
-        min=1960,
-        max=2024,
-        value=2000,
-        marks={1960: "1960", 1980: "1980", 2000: "2000", 2024: "2024"}
-    ),
+        html.Div([
+            dcc.Link("← Back to Home", href="/")
+        ], style={"paddingBottom": "15px"}),
 
-    dcc.RadioItems(
-        id="bar-mode",
-        options=[
-            {"label": "Top", "value": "top"},
-            {"label": "Bottom", "value": "bottom"}
-        ],
-        value="top",
-        inline=True
-    ),
+        html.H2(
+            "Country Rankings",
+            style={
+                "textAlign": "center",
+                "color": "#1f3b5c",
+                "marginBottom": "25px"
+            }
+        ),
 
-    dcc.Slider(
-        id="bar-count",
-        min=5,
-        max=100,
-        step=5,
-        value=10,
-        marks={
-            5: "5",
-            25: "25",
-            50: "50",
-            75: "75",
-            100: "100"
-        }
-    ),
+        html.Div(
 
-    dcc.Graph(id="bar-graph", style={"height": "70vh"})
-])
+            style={
+                "display": "flex",
+                "gap": "15px",
+                "flexWrap": "wrap",
+                "alignItems": "flex-end",
+                "marginBottom": "25px"
+            },
 
+            children=[
+
+                html.Div([
+                    html.Label("Dataset Type"),
+
+                    dcc.Dropdown(
+                        id="type-dropdown",
+                        options=[
+                            {"label": k, "value": k}
+                            for k in dataset_types
+                        ],
+                        value="Nominal",
+                        clearable=False
+                    )
+
+                ], style={"width": "180px"}),
+
+                html.Div([
+
+                    html.Label("Dataset"),
+
+                    dcc.Dropdown(
+                        id="dataset-dropdown"
+                    )
+
+                ], style={"flex": "2"}),
+
+                html.Div([
+
+                    html.Label("Year"),
+
+                    dcc.Dropdown(
+                        id="year-dropdown"
+                    )
+
+                ], style={"width": "120px"}),
+
+                html.Div([
+
+                    html.Label("Mask"),
+
+                    dcc.Dropdown(
+                        id="mask-dropdown",
+                        options=[
+                            {"label": m, "value": m}
+                            for m in MASKS
+                        ],
+                        value="Grouped",
+                        clearable=False
+                    )
+
+                ], style={"width": "170px"}),
+
+                html.Div([
+
+                    html.Label("Top / Bottom"),
+
+                    dcc.Input(
+                        id="top-x",
+                        type="number",
+                        value=10,
+                        min=1,
+                        step=1,
+                        style={"width": "70px"}
+                    ),
+
+                    dcc.RadioItems(
+                        id="top-bottom",
+                        options=[
+                            {"label": "Top", "value": "top"},
+                            {"label": "Bottom", "value": "bottom"}
+                        ],
+                        value="top",
+                        inline=True
+                    )
+
+                ], style={"width": "220px"})
+            ]
+        ),
+
+        dcc.Graph(
+            id="bar-graph",
+            style={
+                "height": "700px",
+                "backgroundColor": "white",
+                "borderRadius": "10px"
+            }
+        )
+    ]
+)
 
 # =========================================================
 # ROUTING
@@ -412,32 +625,207 @@ def scatter_fn(ds, countries, year):
 
     return fig
 
+@app.callback(
+    Output("dataset-dropdown", "options"),
+    Output("dataset-dropdown", "value"),
+    Input("type-dropdown", "value")
+)
+def update_dataset_dropdown(selected_type):
+
+    datasets = dataset_types[selected_type]
+
+    options = [
+        {"label": d, "value": d}
+        for d in datasets
+    ]
+
+    default_map = {
+        "Nominal": "GDPCAP_COM_NOMINAL",
+        "Real 2024": "REALGDPCAP_COM_2024",
+        "YoY % Change": "GDPCAP_COM_NOMINAL"
+    }
+
+    default_value = default_map.get(selected_type)
+
+    if default_value in datasets:
+        value = default_value
+    elif datasets:
+        value = datasets[0]
+    else:
+        value = None
+
+    return options, value
+
+@app.callback(
+    Output("year-dropdown", "options"),
+    Output("year-dropdown", "value"),
+    Input("dataset-dropdown", "value")
+)
+def update_year_dropdown(dataset_name):
+
+    if dataset_name is None:
+        return [], None
+
+    df = get_dataset(dataset_name)
+
+    if df is None:
+        return [], None
+
+    year_cols = sorted(
+        [c for c in df.columns if c != "Country Name"],
+        key=int
+    )
+
+    options = [
+        {"label": y, "value": y}
+        for y in year_cols
+    ]
+
+    return options, year_cols[-1]
+
 
 # =========================================================
 # BAR
 # =========================================================
 @app.callback(
     Output("bar-graph", "figure"),
-    Input("bar-ds", "value"),
-    Input("bar-year", "value"),
-    Input("bar-mode", "value"),
-    Input("bar-count", "value")
+    Input("dataset-dropdown", "value"),
+    Input("mask-dropdown", "value"),
+    Input("top-x", "value"),
+    Input("top-bottom", "value"),
+    Input("year-dropdown", "value"),
+    Input("type-dropdown", "value")
 )
-def bar_fn(ds, year, mode, count):
+def update_chart(
+    dataset_name,
+    mask_name,
+    top_x,
+    top_bottom,
+    selected_year,
+    selected_type
+):
+
+    if dataset_name is None:
+        return go.Figure()
+
+    top_x = top_x or 10
+
+    df = get_dataset(dataset_name).copy()
+
+    year_cols = sorted(
+        [c for c in df.columns if c != "Country Name"],
+        key=int
+    )
+
+    year = (
+        selected_year
+        if selected_year in year_cols
+        else year_cols[-1]
+    )
+
+    # -----------------------------
+    # YoY Transformation
+    # -----------------------------
+    if selected_type == "YoY % Change":
+
+        df = (
+            df.set_index("Country Name")
+              .pct_change(axis=1)
+              .mul(100)
+              .reset_index()
+        )
+
+    # -----------------------------
+    # Apply Mask
+    # -----------------------------
+    df = apply_mask(df, mask_name, year)
+
+    # -----------------------------
+    # Keep selected year
+    # -----------------------------
+    df = df[["Country Name", year]].copy()
+
+    df = df.dropna(subset=[year])
+
+    ascending = (top_bottom == "bottom")
+
+    df = (
+        df.sort_values(year, ascending=ascending)
+          .head(top_x)
+    )
+
+    # Largest displayed at the top
+    df = df.iloc[::-1]
+
+    if selected_type == "YoY % Change":
+        labels = [f"{v:,.1f}%" for v in df[year]]
+    else:
+        labels = [f"{v:,.2f}" for v in df[year]]
+
+    colors = [
+        "#2f5aa6" if v >= 0 else "#d9534f"
+        for v in df[year]
+    ]
 
     fig = go.Figure()
-    df = get_dataset(ds)
-    y = str(year)
 
-    data = df[["Country Name", y]].dropna()
-    data = data.sort_values(y, ascending=(mode == "bottom")).head(count)
+    fig.add_trace(
 
-    fig.add_trace(go.Bar(
-        x=data["Country Name"],
-        y=data[y]
-    ))
+        go.Bar(
 
-    fig.update_layout(template="plotly_white")
+            y=df["Country Name"],
+            x=df[year],
+
+            orientation="h",
+
+            marker=dict(
+                color=colors,
+                line=dict(
+                    color="white",
+                    width=1
+                )
+            ),
+
+            text=labels,
+
+            textposition="auto",
+
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                + year
+                + ": %{x:,.2f}"
+                + "<extra></extra>"
+            )
+
+        )
+
+    )
+
+    fig.update_layout(
+
+        template="plotly_white",
+
+        title=dict(
+            text=f"{dataset_name} ({mask_name}) - {selected_type}",
+            x=0.5
+        ),
+
+        height=max(650, top_x * 40),
+
+        xaxis_title=year,
+
+        yaxis_title="",
+
+        margin=dict(
+            l=180,
+            r=40,
+            t=70,
+            b=40
+        ),
+
+        bargap=0.25
+
+    )
 
     return fig
 
