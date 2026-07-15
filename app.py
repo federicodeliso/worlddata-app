@@ -221,6 +221,12 @@ home = html.Div([
             dcc.Link("Open Bar Charts →", href="/bar")
         ], className="card"),
 
+        html.Div([
+            html.H3("🌍 Global Map"),
+            html.P("Visualize indicators geographically."),
+            dcc.Link("Open Map →", href="/map")
+        ], className="card"),
+
     ], style={
         "display": "grid",
         "gridTemplateColumns": "repeat(auto-fit, minmax(250px, 1fr))",
@@ -291,6 +297,77 @@ scatter = html.Div([
 
     dcc.Graph(id="scatter-graph", style={"height": "70vh"})
 ])
+
+# =========================================================
+# MAP PAGE
+# =========================================================
+
+map_page = html.Div(
+
+    style={
+        "backgroundColor": "#f4f6f9",
+        "padding": "20px",
+        "fontFamily": "Arial"
+    },
+
+    children=[
+
+        html.Div([
+            dcc.Link("← Back to Home", href="/")
+        ], style={"paddingBottom": "15px"}),
+
+        html.H2(
+            "Global Indicator Map",
+            style={
+                "textAlign": "center",
+                "color": "#1f3b5c",
+                "marginBottom": "25px"
+            }
+        ),
+
+        html.Div(
+
+            style={
+                "display": "flex",
+                "gap": "20px",
+                "marginBottom": "20px",
+                "flexWrap": "wrap"
+            },
+
+            children=[
+
+                html.Div([
+
+                    html.Label("Dataset"),
+
+                    dcc.Dropdown(
+                        id="map-dataset"
+                    )
+
+                ], style={"flex": "2"}),
+
+                html.Div([
+
+                    html.Label("Year"),
+
+                    dcc.Dropdown(
+                        id="map-year"
+                    )
+
+                ], style={"width": "150px"})
+
+            ]
+
+        ),
+
+        dcc.Graph(
+            id="map-graph",
+            style={"height": "80vh"}
+        )
+
+    ]
+)
+
 
 # =========================================================
 # BAR PAGE
@@ -438,6 +515,8 @@ def router(p):
         return scatter
     if p == "/bar":
         return bar
+    if p == "/map":
+        return map_page
     return home
 
 
@@ -829,6 +908,115 @@ def update_chart(
 
     return fig
 
+@app.callback(
+    Output("map-dataset","options"),
+    Output("map-dataset","value"),
+    Input("url","pathname")
+)
+def map_dataset(_):
+
+    options = [
+        {"label":k,"value":k}
+        for k in sorted(datasets_dict.keys())
+    ]
+
+    default = (
+        "GDP_COM_NOMINAL"
+        if "GDP_COM_NOMINAL" in datasets_dict
+        else options[0]["value"]
+    )
+
+    return options, default
+
+@app.callback(
+    Output("map-year","options"),
+    Output("map-year","value"),
+    Input("map-dataset","value")
+)
+def map_years(ds):
+
+    if ds is None:
+        return [],None
+
+    df = get_dataset(ds)
+
+    years = sorted(
+        [c for c in df.columns if c!="Country Name"],
+        key=int
+    )
+
+    return (
+        [{"label":y,"value":y} for y in years],
+        years[-1]
+    )
+
+@app.callback(
+    Output("map-graph","figure"),
+    Input("map-dataset","value"),
+    Input("map-year","value")
+)
+def update_map(ds,year):
+
+    if ds is None or year is None:
+        return go.Figure()
+
+    df = get_dataset(ds)
+
+    df = df[["Country Name",year]].dropna()
+
+    fig = px.choropleth(
+
+        df,
+
+        locations="Country Name",
+
+        locationmode="country names",
+
+        color=year,
+
+        color_continuous_scale="Viridis",
+
+        projection="natural earth",
+
+        hover_name="Country Name",
+
+        hover_data={
+            year:":,.2f"
+        }
+
+    )
+
+    fig.update_layout(
+
+        template="plotly_white",
+
+        title={
+            "text":f"{ds} ({year})",
+            "x":0.5
+        },
+
+        geo=dict(
+            showframe=False,
+            showcoastlines=True,
+            coastlinecolor="gray",
+            projection_type="natural earth",
+            bgcolor="rgba(0,0,0,0)"
+        ),
+
+        margin=dict(
+            l=0,
+            r=0,
+            t=60,
+            b=0
+        ),
+
+        coloraxis_colorbar=dict(
+            title=ds
+        )
+
+    )
+
+    return fig
 
 # =========================================================
 # RUN
