@@ -418,38 +418,39 @@ stack_page = html.Div([
 
     html.Div([
         dcc.Link("← Back to Home", href="/")
-    ]),
+    ], style={"padding": "10px"}),
 
-    html.H2("Composition Explorer"),
+    html.H2(
+        "Composition Explorer",
+        style={"textAlign": "center"}
+    ),
 
     html.Div([
 
         dcc.Dropdown(
             id="stack-country",
-            placeholder="Country",
-            multi=True
+            multi=True,
+            placeholder="Select countries"
         ),
 
-        
-
         dcc.Dropdown(
-            id="stack-extra",
+            id="stack-datasets",
             options=dataset_options,
             multi=True,
-            placeholder="Extra datasets (optional)"
+            placeholder="Select datasets to stack"
         )
-
 
     ],
     style={
-        "display":"grid",
-        "gridTemplateColumns":"repeat(2,1fr)",
-        "gap":"15px"
+        "display": "grid",
+        "gridTemplateColumns": "1fr 2fr",
+        "gap": "15px",
+        "marginBottom": "20px"
     }),
 
     dcc.Graph(
         id="stack-chart",
-        style={"height":"80vh"}
+        style={"height": "80vh"}
     )
 
 ])
@@ -1153,150 +1154,89 @@ def update_map(ds,year):
 # COMPOSITION CHART
 # =========================================================
 
-
 @app.callback(
-    Output("stack-country","options"),
-    Output("stack-country","value"),
-    Input("url","pathname")
+    Output("stack-country", "options"),
+    Output("stack-country", "value"),
+    Input("url", "pathname")
 )
 def update_stack_countries(path):
 
     if path != "/stack":
         return [], []
 
-
     countries = set()
 
+    for df in datasets_dict.values():
 
-    # Only scan datasets that are relevant for composition
-    stack_datasets = []
+        if "Country Name" in df.columns:
 
-    for ds_list in STACK_PRESETS.values():
-        for ds in ds_list:
-            stack_datasets.append(
-                ds.replace("_percGDP", "_percGDP")
+            countries.update(
+                df["Country Name"].dropna().unique()
             )
-
-
-    for ds in stack_datasets:
-
-        if ds in datasets_dict:
-
-            df = get_dataset(ds)
-
-            if df is not None:
-
-                countries.update(
-                    df["Country Name"]
-                    .dropna()
-                    .unique()
-                )
-
 
     countries = sorted(countries)
 
-
     options = [
-        {
-            "label": c,
-            "value": c
-        }
+        {"label": c, "value": c}
         for c in countries
     ]
 
+    default = ["Italy"] if "Italy" in countries else countries[:1]
 
-    if "Italy" in countries:
-        return options, ["Italy"]
+    return options, default
 
-    return options, countries[:1]
 
 
 @app.callback(
     Output("stack-chart", "figure"),
     Input("stack-country", "value"),
-    Input("stack-extra", "value")
+    Input("stack-datasets", "value")
 )
-def update_stack(country, extra):
+def update_stack(countries, datasets):
 
     fig = go.Figure()
 
-    if not country:
+    if not countries or not datasets:
+        fig.update_layout(template="plotly_white")
         return fig
 
-
-    datasets = []
-
-
-    if extra:
-
-        for ds in extra:
-
-            if ds in datasets_dict:
-                datasets.append(ds)
-
-
-
-    # -----------------------------
-    # Extra datasets
-    # -----------------------------
-
-    if extra:
-
-        for ds in extra:
-
-            if ds not in datasets:
-                datasets.append(ds)
-
-
-
     colors = px.colors.qualitative.Set3
+    color_index = 0
 
+    for country in countries:
 
-
-    # -----------------------------
-    # Plot
-    # -----------------------------
-
-    for selected_country in country:
-
-
-        for i, ds in enumerate(datasets):
+        for ds in datasets:
 
             df = get_dataset(ds)
 
             if df is None:
                 continue
 
+            if "Country Name" not in df.columns:
+                continue
 
-            row = df[
-                df["Country Name"] == selected_country
-            ]
-
+            row = df[df["Country Name"] == country]
 
             if row.empty:
                 continue
 
-
-
             years = []
             values = []
-
 
             for y in YEARS:
 
                 if y not in row.columns:
                     continue
 
-
                 value = row.iloc[0][y]
-
 
                 if pd.notna(value):
 
                     years.append(int(y))
                     values.append(float(value))
 
-
+            if not years:
+                continue
 
             fig.add_trace(
 
@@ -1307,25 +1247,26 @@ def update_stack(country, extra):
 
                     mode="lines",
 
-                    stackgroup="one",
+                    stackgroup=country,
 
-                    name=f"{ds.replace(value_suffix,'')} — {selected_country}",
+                    name=f"{ds} — {country}",
 
                     line=dict(
                         width=1,
-                        color=colors[i % len(colors)]
+                        color=colors[color_index % len(colors)]
                     )
 
                 )
+
             )
 
-
+            color_index += 1
 
     fig.update_layout(
 
         template="plotly_white",
 
-        title=f"Composition — {', '.join(country)}",
+        title="Composition Explorer",
 
         hovermode="x unified",
 
@@ -1337,15 +1278,15 @@ def update_stack(country, extra):
 
         margin=dict(
             l=50,
-            r=170,
-            t=70,
+            r=180,
+            t=60,
             b=40
         )
 
     )
 
-
     return fig
+
 
 
 # =========================================================
