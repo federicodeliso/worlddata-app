@@ -1173,24 +1173,40 @@ def update_map(ds,year):
 @app.callback(
     Output("stack-country","options"),
     Output("stack-country","value"),
-    Input("stack-preset","value")
+    Input("url","pathname")
 )
-def update_stack_countries(_):
+def update_stack_countries(path):
 
-    # Use all countries from all datasets
+    if path != "/stack":
+        return [], []
+
+
     countries = set()
 
-    for ds in datasets_dict:
 
-        df = get_dataset(ds)
+    # Only scan datasets that are relevant for composition
+    stack_datasets = []
 
-        if df is not None and "Country Name" in df.columns:
-
-            countries.update(
-                df["Country Name"]
-                .dropna()
-                .unique()
+    for ds_list in STACK_PRESETS.values():
+        for ds in ds_list:
+            stack_datasets.append(
+                ds.replace("_percGDP", "_percGDP")
             )
+
+
+    for ds in stack_datasets:
+
+        if ds in datasets_dict:
+
+            df = get_dataset(ds)
+
+            if df is not None:
+
+                countries.update(
+                    df["Country Name"]
+                    .dropna()
+                    .unique()
+                )
 
 
     countries = sorted(countries)
@@ -1209,7 +1225,6 @@ def update_stack_countries(_):
         return options, ["Italy"]
 
     return options, countries[:1]
-
 
 
 @app.callback(
