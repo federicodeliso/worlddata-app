@@ -430,36 +430,20 @@ stack_page = html.Div([
             multi=True
         ),
 
-        dcc.Dropdown(
-            id="stack-preset",
-            options=[
-                {"label":k,"value":k}
-                for k in STACK_PRESETS
-            ],
-            value="Government Expenditure"
-        ),
+        
 
         dcc.Dropdown(
             id="stack-extra",
             options=dataset_options,
             multi=True,
             placeholder="Extra datasets (optional)"
-        ),
-
-        dcc.Dropdown(
-            id="stack-value",
-            options=[
-                {"label":"Current","value":"_curr"},
-                {"label":"Per Capita","value":"_curr_pc"},
-                {"label":"% GDP","value":"_percGDP"}
-            ],
-            value="_percGDP"
         )
+
 
     ],
     style={
         "display":"grid",
-        "gridTemplateColumns":"repeat(4,1fr)",
+        "gridTemplateColumns":"repeat(2,1fr)",
         "gap":"15px"
     }),
 
@@ -1230,11 +1214,9 @@ def update_stack_countries(path):
 @app.callback(
     Output("stack-chart", "figure"),
     Input("stack-country", "value"),
-    Input("stack-preset", "value"),
-    Input("stack-extra", "value"),
-    Input("stack-value", "value")
+    Input("stack-extra", "value")
 )
-def update_stack(country, preset, extra, value_suffix):
+def update_stack(country, extra):
 
     fig = go.Figure()
 
@@ -1245,16 +1227,12 @@ def update_stack(country, preset, extra, value_suffix):
     datasets = []
 
 
-    # -----------------------------
-    # Preset datasets
-    # -----------------------------
+    if extra:
 
-    for ds in STACK_PRESETS[preset]:
+        for ds in extra:
 
-        name = ds.replace("_percGDP", value_suffix)
-
-        if name in datasets_dict:
-            datasets.append(name)
+            if ds in datasets_dict:
+                datasets.append(ds)
 
 
 
@@ -1347,7 +1325,7 @@ def update_stack(country, preset, extra, value_suffix):
 
         template="plotly_white",
 
-        title=f"{preset} — {', '.join(country)}",
+        title=f"Composition — {', '.join(country)}",
 
         hovermode="x unified",
 
