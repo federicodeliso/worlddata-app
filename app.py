@@ -23,6 +23,40 @@ dataset_options = [
     for k in sorted(datasets_dict.keys())
 ]
 
+# =========================================================
+# STACKED PRESETS
+# =========================================================
+
+STACK_PRESETS = {
+
+    "Government Expenditure": [
+        "General public services_percGDP",
+        "Defence_percGDP",
+        "Public order and safety_percGDP",
+        "Economic affairs_percGDP",
+        "Environmental protection_percGDP",
+        "Housing and community amenities_percGDP",
+        "Health_percGDP",
+        "Recreation, culture and religion_percGDP",
+        "Education_percGDP",
+        "Social protection_percGDP",
+        "Interest Payments on Debt_percGDP",
+        "Public Pension Spending_percGDP"
+    ],
+
+    "Tax Revenue": [
+        "Taxes on income, profits and capital gains_percGDP",
+        "Taxes on payroll and workforce_percGDP",
+        "Taxes on property_percGDP",
+        "Taxes on goods and services_percGDP",
+        "Taxes on international trade_percGDP",
+        "Other taxes_percGDP",
+        "Social security contributions_percGDP"
+    ]
+
+}
+
+
 MASKS = ["Grouped", "Standard", "Detailed"]
 
 dataset_types = {
@@ -227,6 +261,12 @@ home = html.Div([
             dcc.Link("Open Map →", href="/map")
         ], className="card"),
 
+        html.Div([
+            html.H3("🟦 Composition"),
+            html.P("Stacked area charts for expenditure, taxes and custom datasets."),
+            dcc.Link("Open Composition →", href="/stack")
+        ], className="card"),
+
     ], style={
         "display": "grid",
         "gridTemplateColumns": "repeat(auto-fit, minmax(250px, 1fr))",
@@ -368,6 +408,65 @@ map_page = html.Div(
     ]
 )
 
+
+# =========================================================
+# STACK PAGE
+# =========================================================
+
+stack_page = html.Div([
+
+    html.Div([
+        dcc.Link("← Back to Home", href="/")
+    ]),
+
+    html.H2("Composition Explorer"),
+
+    html.Div([
+
+        dcc.Dropdown(
+            id="stack-country",
+            placeholder="Country"
+        ),
+
+        dcc.Dropdown(
+            id="stack-preset",
+            options=[
+                {"label":k,"value":k}
+                for k in STACK_PRESETS
+            ],
+            value="Government Expenditure"
+        ),
+
+        dcc.Dropdown(
+            id="stack-extra",
+            options=dataset_options,
+            multi=True,
+            placeholder="Extra datasets (optional)"
+        ),
+
+        dcc.Dropdown(
+            id="stack-value",
+            options=[
+                {"label":"Current","value":"_curr"},
+                {"label":"Per Capita","value":"_curr_pc"},
+                {"label":"% GDP","value":"_percGDP"}
+            ],
+            value="_percGDP"
+        )
+
+    ],
+    style={
+        "display":"grid",
+        "gridTemplateColumns":"repeat(4,1fr)",
+        "gap":"15px"
+    }),
+
+    dcc.Graph(
+        id="stack-chart",
+        style={"height":"80vh"}
+    )
+
+])
 
 # =========================================================
 # BAR PAGE
@@ -517,6 +616,8 @@ def router(p):
         return bar
     if p == "/map":
         return map_page
+    if p == "/stack":
+        return stack_page
     return home
 
 
@@ -1017,6 +1118,139 @@ def update_map(ds,year):
     )
 
     return fig
+
+
+    @app.callback(
+        Output("stack-country","options"),
+        Output("stack-country","value"),
+        Input("stack-preset","value")
+    )
+    def update_stack_country(_):
+
+        df=get_dataset(next(iter(datasets_dict)))
+
+        countries=sorted(df["Country Name"].dropna().unique())
+
+        return (
+            [{"label":c,"value":c} for c in countries],
+            "Italy"
+        )
+
+    @app.callback(
+        Output("stack-chart", "figure"),
+        Input("stack-country", "value"),
+        Input("stack-preset", "value"),
+        Input("stack-extra", "value"),
+        Input("stack-value", "value")
+    )
+    def update_stack(country, preset, extra, value_suffix):
+
+        fig = go.Figure()
+
+        if country is None:
+            return fig
+
+        datasets = []
+
+        # ------------------------------------
+        # Preset datasets
+        # ------------------------------------
+        for ds in STACK_PRESETS[preset]:
+
+            name = ds.replace("_percGDP", value_suffix)
+
+            if name in datasets_dict:
+                datasets.append(name)
+
+        # ------------------------------------
+        # Additional datasets selected manually
+        # ------------------------------------
+        if extra:
+
+            for ds in extra:
+
+                if ds not in datasets:
+                    datasets.append(ds)
+
+        colors = px.colors.qualitative.Set3
+
+        # ------------------------------------
+        # Plot
+        # ------------------------------------
+        for i, ds in enumerate(datasets):
+
+            df = get_dataset(ds)
+
+            if df is None:
+                continue
+
+            row = df[df["Country Name"] == country]
+
+            if row.empty:
+                continue
+
+            years = []
+            values = []
+
+            for y in YEARS:
+
+                if y not in row.columns:
+                    continue
+
+                value = row.iloc[0][y]
+
+                if pd.notna(value):
+
+                    years.append(int(y))
+                    values.append(float(value))
+
+            fig.add_trace(
+
+                go.Scatter(
+
+                    x=years,
+                    y=values,
+
+                    mode="lines",
+
+                    stackgroup="one",
+
+                    name=ds.replace(value_suffix, ""),
+
+                    line=dict(
+                        width=1,
+                        color=colors[i % len(colors)]
+                    )
+
+                )
+
+            )
+
+        fig.update_layout(
+
+            template="plotly_white",
+
+            title=f"{preset} — {country}",
+
+            hovermode="x unified",
+
+            legend=dict(
+                orientation="v",
+                x=1.02,
+                y=1
+            ),
+
+            margin=dict(
+                l=50,
+                r=170,
+                t=70,
+                b=40
+            )
+
+        )
+
+        return fig
+
 
 # =========================================================
 # RUN
