@@ -1120,136 +1120,120 @@ def update_map(ds,year):
     return fig
 
 
-    @app.callback(
-        Output("stack-country","options"),
-        Output("stack-country","value"),
-        Input("stack-preset","value")
-    )
-    def update_stack_country(_):
+@app.callback(
+    Output("stack-chart", "figure"),
+    Input("stack-country", "value"),
+    Input("stack-preset", "value"),
+    Input("stack-extra", "value"),
+    Input("stack-value", "value")
+)
+def update_stack(country, preset, extra, value_suffix):
 
-        df=get_dataset(next(iter(datasets_dict)))
+    fig = go.Figure()
 
-        countries=sorted(df["Country Name"].dropna().unique())
+    if country is None:
+        return fig
 
-        return (
-            [{"label":c,"value":c} for c in countries],
-            "Italy"
-        )
+    datasets = []
 
-    @app.callback(
-        Output("stack-chart", "figure"),
-        Input("stack-country", "value"),
-        Input("stack-preset", "value"),
-        Input("stack-extra", "value"),
-        Input("stack-value", "value")
-    )
-    def update_stack(country, preset, extra, value_suffix):
+    # ------------------------------------
+    # Preset datasets
+    # ------------------------------------
+    for ds in STACK_PRESETS[preset]:
 
-        fig = go.Figure()
+        name = ds.replace("_percGDP", value_suffix)
 
-        if country is None:
-            return fig
+        if name in datasets_dict:
+            datasets.append(name)
 
-        datasets = []
+    # ------------------------------------
+    # Additional datasets selected manually
+    # ------------------------------------
+    if extra:
 
-        # ------------------------------------
-        # Preset datasets
-        # ------------------------------------
-        for ds in STACK_PRESETS[preset]:
+        for ds in extra:
 
-            name = ds.replace("_percGDP", value_suffix)
+            if ds not in datasets:
+                datasets.append(ds)
 
-            if name in datasets_dict:
-                datasets.append(name)
+    colors = px.colors.qualitative.Set3
 
-        # ------------------------------------
-        # Additional datasets selected manually
-        # ------------------------------------
-        if extra:
+    # ------------------------------------
+    # Plot
+    # ------------------------------------
+    for i, ds in enumerate(datasets):
 
-            for ds in extra:
+        df = get_dataset(ds)
 
-                if ds not in datasets:
-                    datasets.append(ds)
+        if df is None:
+            continue
 
-        colors = px.colors.qualitative.Set3
+        row = df[df["Country Name"] == country]
 
-        # ------------------------------------
-        # Plot
-        # ------------------------------------
-        for i, ds in enumerate(datasets):
+        if row.empty:
+            continue
 
-            df = get_dataset(ds)
+        years = []
+        values = []
 
-            if df is None:
+        for y in YEARS:
+
+            if y not in row.columns:
                 continue
 
-            row = df[df["Country Name"] == country]
+            value = row.iloc[0][y]
 
-            if row.empty:
-                continue
+            if pd.notna(value):
 
-            years = []
-            values = []
+                years.append(int(y))
+                values.append(float(value))
 
-            for y in YEARS:
+        fig.add_trace(
 
-                if y not in row.columns:
-                    continue
+            go.Scatter(
 
-                value = row.iloc[0][y]
+                x=years,
+                y=values,
 
-                if pd.notna(value):
+                mode="lines",
 
-                    years.append(int(y))
-                    values.append(float(value))
+                stackgroup="one",
 
-            fig.add_trace(
+                name=ds.replace(value_suffix, ""),
 
-                go.Scatter(
-
-                    x=years,
-                    y=values,
-
-                    mode="lines",
-
-                    stackgroup="one",
-
-                    name=ds.replace(value_suffix, ""),
-
-                    line=dict(
-                        width=1,
-                        color=colors[i % len(colors)]
-                    )
-
+                line=dict(
+                    width=1,
+                    color=colors[i % len(colors)]
                 )
 
             )
 
-        fig.update_layout(
-
-            template="plotly_white",
-
-            title=f"{preset} — {country}",
-
-            hovermode="x unified",
-
-            legend=dict(
-                orientation="v",
-                x=1.02,
-                y=1
-            ),
-
-            margin=dict(
-                l=50,
-                r=170,
-                t=70,
-                b=40
-            )
-
         )
 
-        return fig
+    fig.update_layout(
+
+        template="plotly_white",
+
+        title=f"{preset} — {country}",
+
+        hovermode="x unified",
+
+        legend=dict(
+            orientation="v",
+            x=1.02,
+            y=1
+        ),
+
+        margin=dict(
+            l=50,
+            r=170,
+            t=70,
+            b=40
+        )
+
+    )
+
+    return fig
 
 
 # =========================================================
