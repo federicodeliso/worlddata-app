@@ -853,17 +853,44 @@ def update_year_dropdown(dataset_name):
     if df is None:
         return [], None
 
+
     year_cols = sorted(
-        [c for c in df.columns if c != "Country Name"],
+        [
+            str(c)
+            for c in df.columns
+            if c != "Country Name"
+            and str(c).isdigit()
+        ],
         key=int
     )
 
+
+    # Find latest year with at least one real value
+    available_years = []
+
+    for y in year_cols:
+
+        if df[y].notna().any():
+            available_years.append(y)
+
+
+    if not available_years:
+        return [], None
+
+
+    latest_year = available_years[-1]
+
+
     options = [
-        {"label": y, "value": y}
-        for y in year_cols
+        {
+            "label": y,
+            "value": y
+        }
+        for y in available_years
     ]
 
-    return options, year_cols[-1]
+
+    return options, latest_year
 
 
 # =========================================================
