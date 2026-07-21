@@ -199,7 +199,7 @@ def apply_mask(df, mask_name, year):
 # =========================================================
 # CACHE
 # =========================================================
-@lru_cache(maxsize=50)
+@lru_cache(maxsize=20)
 def get_dataset(ds):
     df = datasets_dict.get(ds)
     if df is None:
