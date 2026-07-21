@@ -4,6 +4,7 @@ from dash import dcc, html, Input, Output, State
 import plotly.graph_objs as go
 import plotly.express as px
 import numpy as np
+import pandas as pd
 from functools import lru_cache
 
 
@@ -425,7 +426,8 @@ stack_page = html.Div([
 
         dcc.Dropdown(
             id="stack-country",
-            placeholder="Country"
+            placeholder="Country",
+            multi=True
         ),
 
         dcc.Dropdown(
@@ -891,9 +893,17 @@ def update_chart(
     top_x = top_x or 10
 
     df = get_dataset(dataset_name).copy()
+    # Normalize year columns to strings
+    df.columns = [
+        str(c) if c != "Country Name" else c
+        for c in df.columns
+    ]
 
     year_cols = sorted(
-        [c for c in df.columns if c != "Country Name"],
+        [
+            c for c in df.columns
+            if c != "Country Name" and str(c).isdigit()
+        ],
         key=int
     )
 
@@ -908,11 +918,19 @@ def update_chart(
     # -----------------------------
     if selected_type == "YoY % Change":
 
+        year_cols = [
+            c for c in df.columns
+            if c != "Country Name"
+            and str(c).isdigit()
+        ]
+        
+        temp = df.set_index("Country Name")[year_cols]
+        
         df = (
-            df.set_index("Country Name")
-              .pct_change(axis=1)
-              .mul(100)
-              .reset_index()
+            temp
+            .pct_change(axis=1)
+            .mul(100)
+            .reset_index()
         )
 
     # -----------------------------
@@ -1008,6 +1026,7 @@ def update_chart(
     )
 
     return fig
+
 
 @app.callback(
     Output("map-dataset","options"),
@@ -1119,6 +1138,52 @@ def update_map(ds,year):
 
     return fig
 
+# =========================================================
+# COMPOSITION CHART
+# =========================================================
+
+
+@app.callback(
+    Output("stack-country","options"),
+    Output("stack-country","value"),
+    Input("stack-preset","value")
+)
+def update_stack_countries(_):
+
+    # Use all countries from all datasets
+    countries = set()
+
+    for ds in datasets_dict:
+
+        df = get_dataset(ds)
+
+        if df is not None and "Country Name" in df.columns:
+
+            countries.update(
+                df["Country Name"]
+                .dropna()
+                .unique()
+            )
+
+
+    countries = sorted(countries)
+
+
+    options = [
+        {
+            "label": c,
+            "value": c
+        }
+        for c in countries
+    ]
+
+
+    if "Italy" in countries:
+        return options, ["Italy"]
+
+    return options, countries[:1]
+
+
 
 @app.callback(
     Output("stack-chart", "figure"),
@@ -1131,14 +1196,17 @@ def update_stack(country, preset, extra, value_suffix):
 
     fig = go.Figure()
 
-    if country is None:
+    if not country:
         return fig
+
 
     datasets = []
 
-    # ------------------------------------
+
+    # -----------------------------
     # Preset datasets
-    # ------------------------------------
+    # -----------------------------
+
     for ds in STACK_PRESETS[preset]:
 
         name = ds.replace("_percGDP", value_suffix)
@@ -1146,9 +1214,12 @@ def update_stack(country, preset, extra, value_suffix):
         if name in datasets_dict:
             datasets.append(name)
 
-    # ------------------------------------
-    # Additional datasets selected manually
-    # ------------------------------------
+
+
+    # -----------------------------
+    # Extra datasets
+    # -----------------------------
+
     if extra:
 
         for ds in extra:
@@ -1156,65 +1227,85 @@ def update_stack(country, preset, extra, value_suffix):
             if ds not in datasets:
                 datasets.append(ds)
 
+
+
     colors = px.colors.qualitative.Set3
 
-    # ------------------------------------
+
+
+    # -----------------------------
     # Plot
-    # ------------------------------------
-    for i, ds in enumerate(datasets):
+    # -----------------------------
 
-        df = get_dataset(ds)
+    for selected_country in country:
 
-        if df is None:
-            continue
 
-        row = df[df["Country Name"] == country]
+        for i, ds in enumerate(datasets):
 
-        if row.empty:
-            continue
+            df = get_dataset(ds)
 
-        years = []
-        values = []
-
-        for y in YEARS:
-
-            if y not in row.columns:
+            if df is None:
                 continue
 
-            value = row.iloc[0][y]
 
-            if pd.notna(value):
+            row = df[
+                df["Country Name"] == selected_country
+            ]
 
-                years.append(int(y))
-                values.append(float(value))
 
-        fig.add_trace(
+            if row.empty:
+                continue
 
-            go.Scatter(
 
-                x=years,
-                y=values,
 
-                mode="lines",
+            years = []
+            values = []
 
-                stackgroup="one",
 
-                name=ds.replace(value_suffix, ""),
+            for y in YEARS:
 
-                line=dict(
-                    width=1,
-                    color=colors[i % len(colors)]
+                if y not in row.columns:
+                    continue
+
+
+                value = row.iloc[0][y]
+
+
+                if pd.notna(value):
+
+                    years.append(int(y))
+                    values.append(float(value))
+
+
+
+            fig.add_trace(
+
+                go.Scatter(
+
+                    x=years,
+                    y=values,
+
+                    mode="lines",
+
+                    stackgroup="one",
+
+                    name=f"{ds.replace(value_suffix,'')} — {selected_country}",
+
+                    line=dict(
+                        width=1,
+                        color=colors[i % len(colors)]
+                    )
+
                 )
-
             )
 
-        )
+
 
     fig.update_layout(
 
         template="plotly_white",
 
-        title=f"{preset} — {country}",
+        title=f"{preset} — {', '.join(country)}",
 
         hovermode="x unified",
 
@@ -1232,6 +1323,7 @@ def update_stack(country, preset, extra, value_suffix):
         )
 
     )
+
 
     return fig
 
