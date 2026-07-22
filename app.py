@@ -6,6 +6,7 @@ import plotly.express as px
 import numpy as np
 import pandas as pd
 from functools import lru_cache
+import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
 # =========================================================
@@ -1185,8 +1186,6 @@ def update_stack_countries(path):
 
     return options, default
 
-
-
 @app.callback(
     Output("stack-chart", "figure"),
     Input("stack-country", "value"),
@@ -1197,9 +1196,7 @@ def update_stack(countries, datasets):
     if not countries or not datasets:
         return go.Figure()
 
-# Two columns
     cols = 2
-
     rows = (len(countries) + cols - 1) // cols
 
     fig = make_subplots(
@@ -1212,11 +1209,12 @@ def update_stack(countries, datasets):
     )
 
     colors = px.colors.qualitative.Set3
+    color_index = 0
 
     for idx, country in enumerate(countries):
 
-        row = idx // cols + 1
-        col = idx % cols + 1
+        subplot_row = idx // cols + 1
+        subplot_col = idx % cols + 1
 
         for ds in datasets:
 
@@ -1228,9 +1226,9 @@ def update_stack(countries, datasets):
             if "Country Name" not in df.columns:
                 continue
 
-            row = df[df["Country Name"] == country]
+            country_row = df[df["Country Name"] == country]
 
-            if row.empty:
+            if country_row.empty:
                 continue
 
             years = []
@@ -1238,10 +1236,10 @@ def update_stack(countries, datasets):
 
             for y in YEARS:
 
-                if y not in row.columns:
+                if y not in country_row.columns:
                     continue
 
-                value = row.iloc[0][y]
+                value = country_row.iloc[0][y]
 
                 if pd.notna(value):
 
@@ -1254,21 +1252,28 @@ def update_stack(countries, datasets):
             fig.add_trace(
 
                 go.Scatter(
+
                     x=years,
                     y=values,
-                    
+
                     mode="lines",
+
                     stackgroup=f"stack_{country}",
+
                     name=ds,
+
                     showlegend=(idx == 0),
+
                     line=dict(
                         width=1,
                         color=colors[color_index % len(colors)]
                     )
+
                 ),
 
-                row=row,
-                col=col
+                row=subplot_row,
+                col=subplot_col
+
             )
 
             color_index += 1
@@ -1279,7 +1284,7 @@ def update_stack(countries, datasets):
 
         title="Composition Explorer",
 
-        height=420 * rows,
+        height=450 * rows,
 
         hovermode="x unified",
 
@@ -1299,7 +1304,6 @@ def update_stack(countries, datasets):
     )
 
     return fig
-
 
 
 # =========================================================
