@@ -6,7 +6,7 @@ import plotly.express as px
 import numpy as np
 import pandas as pd
 from functools import lru_cache
-
+from plotly.subplots import make_subplots
 
 # =========================================================
 # DATA
@@ -1194,16 +1194,29 @@ def update_stack_countries(path):
 )
 def update_stack(countries, datasets):
 
-    fig = go.Figure()
-
     if not countries or not datasets:
-        fig.update_layout(template="plotly_white")
-        return fig
+        return go.Figure()
+
+# Two columns
+    cols = 2
+
+    rows = (len(countries) + cols - 1) // cols
+
+    fig = make_subplots(
+        rows=rows,
+        cols=cols,
+        subplot_titles=countries,
+        shared_xaxes=True,
+        horizontal_spacing=0.08,
+        vertical_spacing=0.12
+    )
 
     colors = px.colors.qualitative.Set3
-    color_index = 0
 
-    for country in countries:
+    for idx, country in enumerate(countries):
+
+        row = idx // cols + 1
+        col = idx % cols + 1
 
         for ds in datasets:
 
@@ -1241,23 +1254,21 @@ def update_stack(countries, datasets):
             fig.add_trace(
 
                 go.Scatter(
-
                     x=years,
                     y=values,
-
+                    
                     mode="lines",
-
-                    stackgroup=country,
-
-                    name=f"{ds} — {country}",
-
+                    stackgroup=f"stack_{country}",
+                    name=ds,
+                    showlegend=(idx == 0),
                     line=dict(
                         width=1,
                         color=colors[color_index % len(colors)]
                     )
+                ),
 
-                )
-
+                row=row,
+                col=col
             )
 
             color_index += 1
@@ -1267,6 +1278,8 @@ def update_stack(countries, datasets):
         template="plotly_white",
 
         title="Composition Explorer",
+
+        height=420 * rows,
 
         hovermode="x unified",
 
@@ -1279,7 +1292,7 @@ def update_stack(countries, datasets):
         margin=dict(
             l=50,
             r=180,
-            t=60,
+            t=70,
             b=40
         )
 
