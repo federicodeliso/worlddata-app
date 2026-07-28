@@ -223,61 +223,181 @@ server = app.server
 
 
 # =========================================================
-# HOME (PROFESSIONAL DASHBOARD STYLE)
+# HOME
 # =========================================================
-home = html.Div([
 
-    html.Div([
-        html.H1("Macro Data Analytics Dashboard",
-                style={"marginBottom": "5px"}),
+home = html.Div(
 
-        html.P(
-            "Explore global indicators across countries and time using interactive visual analytics.",
-            style={"color": "#666", "fontSize": "16px"}
+    style={
+        "backgroundColor": "#F8FAFC",
+        "minHeight": "100vh",
+        "fontFamily": "Segoe UI, sans-serif",
+        "paddingBottom": "50px"
+    },
+
+    children=[
+
+        # Hero
+        html.Div(
+
+            [
+
+                html.H1(
+                    "Macro Data Analytics",
+                    style={
+                        "fontSize": "56px",
+                        "fontWeight": "700",
+                        "color": "#0F172A",
+                        "marginBottom": "10px"
+                    }
+                ),
+
+                html.P(
+                    "Explore global economic, fiscal, labour and demographic data.",
+                    style={
+                        "fontSize": "20px",
+                        "color": "#64748B",
+                        "marginBottom": "35px"
+                    }
+                ),
+
+                dcc.Link(
+                    "Start Exploring",
+                    href="/line",
+                    style={
+                        "backgroundColor": "#2563EB",
+                        "color": "white",
+                        "padding": "14px 34px",
+                        "borderRadius": "12px",
+                        "textDecoration": "none",
+                        "fontWeight": "600",
+                        "fontSize": "18px",
+                        "boxShadow": "0 8px 20px rgba(37,99,235,.25)"
+                    }
+                )
+
+            ],
+
+            style={
+                "textAlign": "center",
+                "padding": "70px 20px 60px"
+            }
+
+        ),
+
+        # Dashboard cards
+        html.Div(
+
+            [
+
+                dcc.Link(
+
+                    html.Div([
+
+                        html.Div("📈", style={"fontSize": "48px"}),
+
+                        html.H3("Trends"),
+
+                        html.P("Explore time series")
+
+                    ], className="home-card"),
+
+                    href="/line",
+                    style={"textDecoration": "none", "color": "inherit"}
+
+                ),
+
+                dcc.Link(
+
+                    html.Div([
+
+                        html.Div("🌍", style={"fontSize": "48px"}),
+
+                        html.H3("World Map"),
+
+                        html.P("Visualize countries")
+
+                    ], className="home-card"),
+
+                    href="/map",
+                    style={"textDecoration": "none", "color": "inherit"}
+
+                ),
+
+                dcc.Link(
+
+                    html.Div([
+
+                        html.Div("📊", style={"fontSize": "48px"}),
+
+                        html.H3("Rankings"),
+
+                        html.P("Compare countries")
+
+                    ], className="home-card"),
+
+                    href="/bar",
+                    style={"textDecoration": "none", "color": "inherit"}
+
+                ),
+
+                dcc.Link(
+
+                    html.Div([
+
+                        html.Div("🔵", style={"fontSize": "48px"}),
+
+                        html.H3("Correlation"),
+
+                        html.P("Compare indicators")
+
+                    ], className="home-card"),
+
+                    href="/scatter",
+                    style={"textDecoration": "none", "color": "inherit"}
+
+                ),
+
+                dcc.Link(
+
+                    html.Div([
+
+                        html.Div("🧩", style={"fontSize": "48px"}),
+
+                        html.H3("Composition"),
+
+                        html.P("Government finance")
+
+                    ], className="home-card"),
+
+                    href="/stack",
+                    style={"textDecoration": "none", "color": "inherit"}
+
+                )
+
+            ],
+
+            style={
+
+                "display": "grid",
+
+                "gridTemplateColumns": "repeat(auto-fit, minmax(250px,1fr))",
+
+                "gap": "25px",
+
+                "maxWidth": "1200px",
+
+                "margin": "0 auto",
+
+                "padding": "0 30px"
+
+            }
+
         )
-    ], style={"textAlign": "center", "padding": "40px 20px"}),
 
-    html.Div([
+    ]
 
-        html.Div([
-            html.H3("📈 Trend Analysis"),
-            html.P("Compare multiple indicators across countries over time."),
-            dcc.Link("Open Line Chart →", href="/line")
-        ], className="card"),
-
-        html.Div([
-            html.H3("🔵 Correlation Explorer"),
-            html.P("Analyze relationships between economic indicators."),
-            dcc.Link("Open Scatter Plot →", href="/scatter")
-        ], className="card"),
-
-        html.Div([
-            html.H3("📊 Rankings"),
-            html.P("View top and bottom countries by indicator."),
-            dcc.Link("Open Bar Charts →", href="/bar")
-        ], className="card"),
-
-        html.Div([
-            html.H3("🌍 Global Map"),
-            html.P("Visualize indicators geographically."),
-            dcc.Link("Open Map →", href="/map")
-        ], className="card"),
-
-        html.Div([
-            html.H3("🟦 Composition"),
-            html.P("Stacked area charts for expenditure, taxes and custom datasets."),
-            dcc.Link("Open Composition →", href="/stack")
-        ], className="card"),
-
-    ], style={
-        "display": "grid",
-        "gridTemplateColumns": "repeat(auto-fit, minmax(250px, 1fr))",
-        "gap": "20px",
-        "padding": "0 40px 60px"
-    })
-
-])
-
+)
 
 # =========================================================
 # LINE PAGE
