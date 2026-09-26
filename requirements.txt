@@ -4,3 +4,4 @@ pandas
 joblib
 numpy
 gunicorn
+Flask-HTTPAuth
