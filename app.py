@@ -6,8 +6,9 @@ import plotly.express as px
 import numpy as np
 import pandas as pd
 from functools import lru_cache
-import plotly.graph_objs as go
+from flask_httpauth import HTTPBasicAuth
 from plotly.subplots import make_subplots
+import os
 
 # =========================================================
 # DATA
@@ -218,9 +219,38 @@ def get_dataset(ds):
 # =========================================================
 # APP
 # =========================================================
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
+
+app = dash.Dash(
+    __name__,
+    suppress_callback_exceptions=True
+)
+
 server = app.server
 
+
+# =========================================================
+# PASSWORD PROTECTION
+# =========================================================
+
+auth = HTTPBasicAuth()
+
+USERNAME = os.environ.get("federicodeliso")
+PASSWORD = os.environ.get("peppinomio")
+
+
+@auth.verify_password
+def verify_password(username, password):
+
+    if username == USERNAME and password == PASSWORD:
+        return username
+
+    return None
+
+
+@app.server.before_request
+@auth.login_required
+def protect_app():
+    pass
 
 # =========================================================
 # HOME
