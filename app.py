@@ -8,7 +8,6 @@ import pandas as pd
 from functools import lru_cache
 from plotly.subplots import make_subplots
 from flask import session, redirect, request
-import secrets
 
 # =========================================================
 # DATA
@@ -235,145 +234,165 @@ server = app.server
 USERNAME = "federicodeliso"
 PASSWORD = "W7mQ2xL9pR4k"
 
-SECRET_KEY = "1803200331121998"
-
-server.secret_key = SECRET_KEY
+# Required by Flask sessions
+server.config["SECRET_KEY"] = "my-worlddata-secret-key-2026"
 
 
 @server.before_request
 def protect_app():
 
-    # Allow the login page
+    # Login page must always be accessible
     if request.path == "/login":
-        return
+        return None
 
-    # Allow Dash internal component requests
-    if request.path.startswith("/_dash-component-suites/"):
-        return
-
-    # Allow assets
+    # Allow Dash assets and internal files
     if request.path.startswith("/assets/"):
-        return
+        return None
 
-    # If not logged in, redirect to login
+    if request.path.startswith("/_dash-component-suites/"):
+        return None
+
+    # Everything else requires login
     if not session.get("logged_in"):
         return redirect("/login")
+
+    return None
 
 
 @server.route("/login", methods=["GET", "POST"])
 def login():
+
+    error = ""
 
     if request.method == "POST":
 
         username = request.form.get("username", "")
         password = request.form.get("password", "")
 
-        if (
-            secrets.compare_digest(username, USERNAME)
-            and secrets.compare_digest(password, PASSWORD)
-        ):
+        if username == USERNAME and password == PASSWORD:
 
             session["logged_in"] = True
 
             return redirect("/")
 
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Login - WorldData</title>
-        </head>
+        error = """
+        <p style="
+            color:#dc2626;
+            text-align:center;
+            margin-bottom:20px;
+        ">
+            Incorrect username or password
+        </p>
+        """
 
-        <body style="
-            margin:0;
-            background:#F8FAFC;
-            font-family:Segoe UI, Arial, sans-serif;
+    return f"""
+    <!DOCTYPE html>
+    <html>
+
+    <head>
+        <title>WorldData Login</title>
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1"
+        >
+    </head>
+
+    <body style="
+        margin:0;
+        background:#F8FAFC;
+        font-family:Segoe UI, Arial, sans-serif;
+    ">
+
+        <div style="
+            width:360px;
+            max-width:calc(100% - 40px);
+            margin:120px auto;
+            padding:35px;
+            background:white;
+            border-radius:12px;
+            box-shadow:0 4px 20px rgba(0,0,0,0.10);
         ">
 
-            <div style="
-                width:360px;
-                max-width:calc(100% - 40px);
-                margin:120px auto;
-                padding:35px;
-                background:white;
-                border-radius:12px;
-                box-shadow:0 4px 20px rgba(0,0,0,0.10);
+            <h1 style="
+                text-align:center;
+                color:#0F172A;
+                margin:0 0 8px 0;
             ">
+                WorldData
+            </h1>
 
-                <h1 style="
-                    text-align:center;
-                    color:#0F172A;
-                    margin-bottom:8px;
-                ">
-                    WorldData
-                </h1>
+            <p style="
+                text-align:center;
+                color:#64748B;
+                margin-bottom:30px;
+            ">
+                Login to continue
+            </p>
 
-                <p style="
-                    text-align:center;
-                    color:#64748B;
-                    margin-bottom:30px;
-                ">
-                    Incorrect username or password
-                </p>
+            {error}
 
-                <form method="POST">
+            <form method="POST">
 
-                    <input
-                        type="text"
-                        name="username"
-                        placeholder="Username"
-                        required
-                        style="
-                            width:100%;
-                            box-sizing:border-box;
-                            padding:12px;
-                            margin-bottom:14px;
-                            border:1px solid #CBD5E1;
-                            border-radius:7px;
-                            font-size:15px;
-                        "
-                    >
+                <input
+                    type="text"
+                    name="username"
+                    placeholder="Username"
+                    required
+                    autocomplete="username"
+                    style="
+                        width:100%;
+                        box-sizing:border-box;
+                        padding:12px;
+                        margin-bottom:14px;
+                        border:1px solid #CBD5E1;
+                        border-radius:7px;
+                        font-size:15px;
+                    "
+                >
 
-                    <input
-                        type="password"
-                        name="password"
-                        placeholder="Password"
-                        required
-                        style="
-                            width:100%;
-                            box-sizing:border-box;
-                            padding:12px;
-                            margin-bottom:20px;
-                            border:1px solid #CBD5E1;
-                            border-radius:7px;
-                            font-size:15px;
-                        "
-                    >
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    required
+                    autocomplete="current-password"
+                    style="
+                        width:100%;
+                        box-sizing:border-box;
+                        padding:12px;
+                        margin-bottom:20px;
+                        border:1px solid #CBD5E1;
+                        border-radius:7px;
+                        font-size:15px;
+                    "
+                >
 
-                    <button
-                        type="submit"
-                        style="
-                            width:100%;
-                            padding:12px;
-                            border:none;
-                            border-radius:7px;
-                            background:#2563EB;
-                            color:white;
-                            font-size:15px;
-                            font-weight:600;
-                            cursor:pointer;
-                        "
-                    >
-                        Login
-                    </button>
+                <button
+                    type="submit"
+                    style="
+                        width:100%;
+                        padding:12px;
+                        border:none;
+                        border-radius:7px;
+                        background:#2563EB;
+                        color:white;
+                        font-size:15px;
+                        font-weight:600;
+                        cursor:pointer;
+                    "
+                >
+                    Login
+                </button>
 
-                </form>
+            </form>
 
-            </div>
+        </div>
 
-        </body>
-        </html>
-        """
+    </body>
+
+    </html>
+    """
 
 
 @server.route("/logout")
