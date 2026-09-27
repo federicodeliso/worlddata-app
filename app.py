@@ -6,9 +6,9 @@ import plotly.express as px
 import numpy as np
 import pandas as pd
 from functools import lru_cache
-from flask_httpauth import HTTPBasicAuth
 from plotly.subplots import make_subplots
-import os
+from flask import session, redirect, request
+import secrets
 
 # =========================================================
 # DATA
@@ -232,25 +232,156 @@ server = app.server
 # PASSWORD PROTECTION
 # =========================================================
 
-auth = HTTPBasicAuth()
+USERNAME = "federicodeliso"
+PASSWORD = "W7mQ2xL9pR4k"
 
-USERNAME = os.environ.get("federicodeliso")
-PASSWORD = os.environ.get("peppinomio")
+SECRET_KEY = "1803200331121998"
 
-
-@auth.verify_password
-def verify_password(username, password):
-
-    if username == USERNAME and password == PASSWORD:
-        return username
-
-    return None
+server.secret_key = SECRET_KEY
 
 
-@app.server.before_request
-@auth.login_required
+@server.before_request
 def protect_app():
-    pass
+
+    # Allow the login page
+    if request.path == "/login":
+        return
+
+    # Allow Dash internal component requests
+    if request.path.startswith("/_dash-component-suites/"):
+        return
+
+    # Allow assets
+    if request.path.startswith("/assets/"):
+        return
+
+    # If not logged in, redirect to login
+    if not session.get("logged_in"):
+        return redirect("/login")
+
+
+@server.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+
+        if (
+            secrets.compare_digest(username, USERNAME)
+            and secrets.compare_digest(password, PASSWORD)
+        ):
+
+            session["logged_in"] = True
+
+            return redirect("/")
+
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Login - WorldData</title>
+        </head>
+
+        <body style="
+            margin:0;
+            background:#F8FAFC;
+            font-family:Segoe UI, Arial, sans-serif;
+        ">
+
+            <div style="
+                width:360px;
+                max-width:calc(100% - 40px);
+                margin:120px auto;
+                padding:35px;
+                background:white;
+                border-radius:12px;
+                box-shadow:0 4px 20px rgba(0,0,0,0.10);
+            ">
+
+                <h1 style="
+                    text-align:center;
+                    color:#0F172A;
+                    margin-bottom:8px;
+                ">
+                    WorldData
+                </h1>
+
+                <p style="
+                    text-align:center;
+                    color:#64748B;
+                    margin-bottom:30px;
+                ">
+                    Incorrect username or password
+                </p>
+
+                <form method="POST">
+
+                    <input
+                        type="text"
+                        name="username"
+                        placeholder="Username"
+                        required
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                            padding:12px;
+                            margin-bottom:14px;
+                            border:1px solid #CBD5E1;
+                            border-radius:7px;
+                            font-size:15px;
+                        "
+                    >
+
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="Password"
+                        required
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                            padding:12px;
+                            margin-bottom:20px;
+                            border:1px solid #CBD5E1;
+                            border-radius:7px;
+                            font-size:15px;
+                        "
+                    >
+
+                    <button
+                        type="submit"
+                        style="
+                            width:100%;
+                            padding:12px;
+                            border:none;
+                            border-radius:7px;
+                            background:#2563EB;
+                            color:white;
+                            font-size:15px;
+                            font-weight:600;
+                            cursor:pointer;
+                        "
+                    >
+                        Login
+                    </button>
+
+                </form>
+
+            </div>
+
+        </body>
+        </html>
+        """
+
+
+@server.route("/logout")
+def logout():
+
+    session.clear()
+
+    return redirect("/login")
 
 # =========================================================
 # HOME
